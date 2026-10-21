@@ -1,0 +1,13 @@
+Subject: $title: $url
+
+URL: $url
+Domain: $domain
+
+$case_sentence
+
+$description
+
+Evidence, captured on $captured:
+$evidence
+
+Reported by $signature_inline.

@@ -1,0 +1,18 @@
+Asunto: Denuncia de $title: $url
+
+Estimado equipo de abuso de $recipient:
+
+Les escribimos para denunciar el sitio web $url, $hosted. $case_sentence
+
+$description
+
+Pruebas, obtenidas el $captured:
+$evidence
+
+El paquete de pruebas adjunto ($evidence_file) contiene la captura de pantalla, el código de la página tal como se sirve y tal como se muestra, y los datos de DNS y de registro que recopilamos, con la suma de verificación SHA-256 de cada archivo.
+
+Les rogamos que retiren este contenido de acuerdo con su política de uso aceptable. Quedamos a su disposición para cualquier información adicional.
+
+Atentamente,
+
+$signature

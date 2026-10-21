@@ -1,0 +1,18 @@
+Subject: $title report: $domain
+
+Dear $recipient abuse team,
+
+We are writing to report the domain $domain, registered through your company. $case_sentence
+
+$description
+
+Evidence, captured on $captured:
+$evidence
+
+The attached evidence package ($evidence_file) contains the screenshot, the page source as served and as rendered, and the DNS and registration data we collected, with a SHA-256 checksum for each file.
+
+We kindly ask you to investigate this domain and suspend it in accordance with your abuse policy. We remain available should you need any further information.
+
+Kind regards,
+
+$signature

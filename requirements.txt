@@ -1,0 +1,10 @@
+requests
+tldextract
+lingua-language-detector
+beautifulsoup4
+idna
+python-dateutil
+python-dotenv
+dnspython
+pillow
+playwright

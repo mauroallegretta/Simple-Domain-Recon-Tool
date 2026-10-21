@@ -1,0 +1,22 @@
+# Only the project itself is tracked at the top level. Everything else in this folder
+# stays local: .env (settings and API key), runs/ (real investigation data), results
+# databases, JSONL exports, domain lists, takedown attachments, .venv/, editor state.
+# A new top-level file or folder that belongs in the repo needs its own ! line here.
+/*
+!/.gitignore
+!/.env.example
+!/README.md
+!/LICENSE
+!/recon
+!/requirements.txt
+!/domainrecon/
+
+# Inside the package
+__pycache__/
+*.pyc
+.env
+*.sqlite
+*.sqlite3
+*.db
+*.jsonl
+.DS_Store

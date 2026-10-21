@@ -1,0 +1,13 @@
+Asunto: Denuncia de $title: $url
+
+URL: $url
+Dominio: $domain
+
+$case_sentence
+
+$description
+
+Pruebas, obtenidas el $captured:
+$evidence
+
+Denunciado por $signature_inline.

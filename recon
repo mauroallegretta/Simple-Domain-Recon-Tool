@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# domain-recon command line, runnable from any folder:  ./recon --help
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+python="$here/.venv/bin/python"
+[ -x "$python" ] || python="python3"
+# -P: the package always comes from this folder, never from the folder you run it in
+PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec "$python" -P -m domainrecon "$@"

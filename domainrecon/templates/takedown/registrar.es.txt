@@ -1,0 +1,18 @@
+Asunto: Denuncia de $title: $domain
+
+Estimado equipo de abuso de $recipient:
+
+Les escribimos para denunciar el dominio $domain, registrado a través de su empresa. $case_sentence
+
+$description
+
+Pruebas, obtenidas el $captured:
+$evidence
+
+El paquete de pruebas adjunto ($evidence_file) contiene la captura de pantalla, el código de la página tal como se sirve y tal como se muestra, y los datos de DNS y de registro que recopilamos, con la suma de verificación SHA-256 de cada archivo.
+
+Les rogamos que investiguen este dominio y lo suspendan de acuerdo con su política de abuso. Quedamos a su disposición para cualquier información adicional.
+
+Atentamente,
+
+$signature

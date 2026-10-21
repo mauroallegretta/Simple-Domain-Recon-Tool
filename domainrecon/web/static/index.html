@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>domain-recon</title>
+<style>
+  @font-face { font-family: "Space Grotesk"; font-weight: 400; font-display: swap; src: url(/static/fonts/space-grotesk-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Space Grotesk"; font-weight: 500; font-display: swap; src: url(/static/fonts/space-grotesk-latin-500-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Space Grotesk"; font-weight: 700; font-display: swap; src: url(/static/fonts/space-grotesk-latin-700-normal.woff2) format("woff2"); }
+  @font-face { font-family: "IBM Plex Mono"; font-weight: 400; font-display: swap; src: url(/static/fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family: "IBM Plex Mono"; font-weight: 500; font-display: swap; src: url(/static/fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2"); }
+
+  :root {
+    --bg: #121314; --surface: #1a1b1d; --raised: #222326; --field: #151617;
+    --line: #2c2e31; --line-strong: #3d4044;
+    --text: #ecebe7; --muted: #9a9892; --faint: #66645f;
+    --accent: #ff7a2f; --accent-ink: #1a0d04; --accent-soft: rgba(255, 122, 47, .12);
+    --owner: #8fb3ff; --owner-soft: rgba(143, 179, 255, .12); --error: #ff6464;
+    --ui: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", Menlo, Consolas, monospace;
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f3f1ec; --surface: #fbfaf7; --raised: #efece5; --field: #ffffff;
+      --line: #dcd8cf; --line-strong: #c4bfb3;
+      --text: #1c1b19; --muted: #6b675f; --faint: #a19c91;
+      --accent: #d9530b; --accent-ink: #ffffff; --accent-soft: rgba(217, 83, 11, .09);
+      --owner: #2d5bc4; --owner-soft: rgba(45, 91, 196, .09); --error: #c62828;
+      color-scheme: light;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--text);
+         font: 15px/1.5 var(--ui); -webkit-font-smoothing: antialiased; }
+  button, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .mono { font-family: var(--mono); }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+            padding: 0 24px; height: 56px; border-bottom: 1px solid var(--line); background: var(--surface); }
+  .brand { font: 700 18px var(--ui); letter-spacing: -.02em; }
+  .brand span { color: var(--accent); }
+  .tag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid var(--line);
+         border-radius: 3px; font: 12px/1.5 var(--mono); color: var(--muted); white-space: nowrap; }
+  .tag.owner { color: var(--owner); border-color: transparent; background: var(--owner-soft); }
+  .tag.accent { color: var(--accent); border-color: transparent; background: var(--accent-soft); }
+  .tag.danger { color: var(--error); border-color: transparent; background: rgba(255, 100, 100, .12); }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .count-badge { display: inline-block; min-width: 20px; margin-left: 8px; padding: 0 6px; border-radius: 3px;
+                 background: var(--raised); font: 500 12px/20px var(--mono); text-align: center; }
+  .count-badge.active { background: var(--accent); color: var(--accent-ink); }
+
+  .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px 1fr; }
+  .side { border-right: 1px solid var(--line); background: var(--surface); overflow: auto; }
+  .section { padding: 20px 24px; border-bottom: 1px solid var(--line); }
+  .label { display: block; margin: 0 0 8px; font: 500 12px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+  textarea, .input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 3px;
+                     background: var(--field); font: 14px/1.6 var(--mono); }
+  textarea { min-height: 170px; resize: vertical; }
+  textarea:focus, .input:focus { outline: none; border-color: var(--accent); }
+
+  .toggle { display: flex; align-items: center; gap: 10px; margin-top: 16px; cursor: pointer; user-select: none; font-size: 14px; }
+  .switch { flex: none; width: 34px; height: 18px; padding: 0; border: 1px solid var(--line-strong); border-radius: 3px;
+            background: var(--field); position: relative; cursor: pointer; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 2px; background: var(--faint); }
+  .switch[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .switch[aria-checked="true"]::after { left: 18px; background: var(--accent); }
+  #compare-opts { margin-top: 10px; }
+
+  .go { width: 100%; margin-top: 18px; padding: 11px 16px; border: 0; border-radius: 3px; cursor: pointer;
+        background: var(--accent); color: var(--accent-ink); font: 700 15px var(--ui); letter-spacing: .01em; }
+  .go:hover { filter: brightness(1.08); }
+  .go:disabled { cursor: progress; opacity: .55; }
+  .status { margin-top: 10px; font-size: 13px; color: var(--muted); min-height: 1em; }
+  .status.error { color: var(--error); }
+
+  .history-tile { cursor: pointer; }
+  .history-tile:hover { background: var(--raised); }
+  .tile-head { display: flex; align-items: baseline; justify-content: space-between; }
+  .tile-head .label { margin: 0; }
+  .count { font: 500 22px var(--mono); }
+  .recent { margin: 12px 0 0; padding: 0; list-style: none; }
+  .recent li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .recent li span:first-child { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent li span:last-child { color: var(--faint); white-space: nowrap; }
+  .recent li:hover span:first-child { color: var(--accent); }
+
+  .feed { overflow: auto; padding: 24px 28px 40px; min-width: 0; }
+  .feed-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px; }
+  .feed-head h2 { margin: 0; font: 700 22px var(--ui); letter-spacing: -.02em; }
+  .feed-head p { margin: 0; font: 13px var(--mono); color: var(--muted); }
+
+  .result { border: 1px solid var(--line); border-radius: 4px; background: var(--surface); margin-bottom: 16px; }
+  .result-head { display: flex; gap: 18px; align-items: flex-start; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+  .result-head h3 { margin: 0 0 8px; font: 500 18px var(--mono); word-break: break-all; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .result-body { padding: 4px 18px 16px; }
+  .thumb { flex: none; width: 176px; height: 110px; border: 1px solid var(--line); border-radius: 3px; object-fit: cover;
+           object-position: top; cursor: zoom-in; background: var(--field); }
+  .thumb.none { display: grid; place-items: center; cursor: default; font: 12px var(--mono); color: var(--faint); }
+
+  .facts { display: grid; grid-template-columns: 150px 1fr; margin: 0; }
+  .facts dt, .facts dd { padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .facts dt { font: 13px/1.6 var(--mono); color: var(--muted); }
+  .facts dd { margin: 0; font-size: 14px; word-break: break-word; }
+  .facts dd.na { color: var(--faint); }
+  .facts dt:last-of-type, .facts dd:last-of-type { border-bottom: 0; }
+  .block { margin-top: 14px; padding: 12px 14px; border-left: 2px solid var(--accent); background: var(--raised); }
+  .block.quiet { border-left-color: var(--line-strong); }
+  .block h4 { margin: 0 0 4px; font: 500 12px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .block p { margin: 0; }
+  .block .sub { margin-top: 6px; font-size: 13px; color: var(--muted); }
+  .row { display: grid; grid-template-columns: 110px 1fr; gap: 12px; }
+  .row + .row { margin-top: 10px; }
+  .row b { font: 500 12px/1.9 var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .signals { margin: 14px 0 0; padding: 0; list-style: none; }
+  .signals li { position: relative; padding: 3px 0 3px 16px; font-size: 14px; }
+  .signals li::before { content: ""; position: absolute; left: 2px; top: .8em; width: 6px; height: 6px; background: var(--accent); }
+
+  .email { margin: 14px 0 6px; border: 1px solid var(--line); border-left: 2px solid var(--accent); border-radius: 3px; }
+  .email-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 6px 6px 12px;
+               border-bottom: 1px solid var(--line); background: var(--raised); }
+  .email-bar .label { margin: 0; }
+  .email-text { margin: 0; padding: 12px 14px; white-space: pre-wrap; font: 14px/1.6 var(--ui); user-select: text; }
+  .btn { padding: 5px 12px; border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface);
+         cursor: pointer; font: 500 13px var(--ui); color: var(--text); white-space: nowrap; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 3px; overflow: hidden; }
+  .seg button { padding: 4px 10px; border: 0; background: transparent; cursor: pointer; font: 500 12px var(--mono); color: var(--muted); }
+  .seg button + button { border-left: 1px solid var(--line-strong); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .feed-tools { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .btn.strong { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn:disabled { opacity: .55; cursor: progress; }
+
+  .takedown { margin: 14px 0 6px; border: 1px solid var(--line); border-left: 2px solid var(--line-strong); border-radius: 3px; }
+  .takedown.proposed { border-left-color: var(--error); }
+  .takedown-bar { display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 12px; background: var(--raised); }
+  .takedown-bar .label { margin: 0; }
+  .takedown-status { flex: 1; font-size: 14px; color: var(--muted); }
+  .takedown.proposed .takedown-status { color: var(--error); font-weight: 500; }
+  .takedown-body:empty { display: none; }
+  .takedown-body { padding: 4px 12px 12px; }
+  .takedown-note { margin: 10px 0 0; font-size: 13px; color: var(--error); }
+  .evidence-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; font: 12px var(--mono); color: var(--muted); }
+  details.draft { margin-top: 8px; border: 1px solid var(--line); border-radius: 3px; }
+  details.draft summary { display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; list-style: none; }
+  details.draft summary::-webkit-details-marker { display: none; }
+  details.draft summary::before { content: "+"; width: 10px; font: 500 14px var(--mono); color: var(--muted); }
+  details.draft[open] summary::before { content: "−"; }
+  .draft-kind { flex: none; width: 84px; font: 500 12px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .draft-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .draft-address { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--mono); color: var(--muted); }
+  .draft-subject { padding: 2px 10px 0; font-weight: 500; }
+  .draft .email-text { padding: 8px 10px 10px; }
+  .draft-actions { display: flex; gap: 6px; padding: 0 10px 10px; }
+
+  .scrim { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .5); }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 21; width: min(640px, 100vw); display: flex; flex-direction: column;
+            background: var(--surface); border-left: 1px solid var(--line); }
+  .drawer-head { display: flex; align-items: center; gap: 12px; padding: 0 20px; height: 56px; border-bottom: 1px solid var(--line); }
+  .drawer-head h2 { flex: 1; margin: 0; font: 500 17px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .icon-btn { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--line);
+              border-radius: 3px; background: transparent; color: var(--muted); cursor: pointer; font: 16px var(--mono); }
+  .icon-btn:hover { color: var(--text); border-color: var(--line-strong); }
+  .drawer-tools { padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  .drawer-body { flex: 1; overflow: auto; }
+  .dom-row { width: 100%; display: flex; justify-content: space-between; gap: 16px; padding: 12px 20px; border: 0;
+             border-bottom: 1px solid var(--line); background: transparent; cursor: pointer; text-align: left; }
+  .dom-row:hover { background: var(--raised); }
+  .dom-row .name { font: 500 14px var(--mono); word-break: break-all; }
+  .dom-row .meta { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .dom-row .case-line { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); }
+  .dom-row .case-line.high { color: var(--error); }
+  .checksums { padding: 0 10px 8px; }
+  .checksums dd { font-size: 12px; word-break: break-all; }
+  .empty { padding: 32px 20px; color: var(--muted); font-size: 14px; }
+  .detail-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  .ghost { padding: 7px 12px; border: 1px solid var(--accent); border-radius: 3px; background: transparent; color: var(--accent); cursor: pointer; font: 500 13px var(--ui); }
+  .ghost:hover { background: var(--accent-soft); }
+  .check { padding: 18px 20px; border-bottom: 1px solid var(--line); }
+  .check-when { font: 500 14px var(--mono); }
+  .check-run { margin: 2px 0 10px; font: 12px var(--mono); color: var(--muted); }
+  .check .thumb { width: 100%; height: 160px; margin-top: 14px; }
+
+  #lightbox { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px;
+              background: rgba(0, 0, 0, .88); cursor: zoom-out; }
+  #lightbox img { max-width: 100%; max-height: 100%; }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .side { border-right: 0; }
+    .result-head { flex-direction: column; }
+    .result-head .thumb { width: 100%; height: 170px; }
+    .facts { grid-template-columns: 1fr; }
+    .facts dt { border-bottom: 0; padding-bottom: 0; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">domain<span>/</span>recon</div>
+  <div class="topbar-right">
+    <button class="btn" id="cases-btn" type="button">Takedowns<span class="count-badge" id="cases-count">0</span></button>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="side">
+    <section class="section">
+      <label class="label" for="domains">Domains</label>
+      <textarea id="domains" spellcheck="false"></textarea>
+      <div class="toggle" id="toggle">
+        <button type="button" class="switch" id="compare" role="switch" aria-checked="false" aria-labelledby="compare-label"></button>
+        <span id="compare-label">Compare with monitored domain</span>
+      </div>
+      <div id="compare-opts" hidden>
+        <input class="input" id="monitored" type="text" placeholder="yourcompany.com" spellcheck="false" autocomplete="off" aria-label="Monitored domain">
+      </div>
+      <button class="go" id="go" type="button">Run check</button>
+      <div class="status" id="status" role="status"></div>
+    </section>
+
+    <section class="section history-tile" id="history-tile" role="button" tabindex="0" aria-label="Open history">
+      <div class="tile-head"><span class="label">History</span><span class="count" id="hist-count">–</span></div>
+      <ul class="recent" id="hist-recent"></ul>
+    </section>
+  </aside>
+
+  <section class="feed" id="feed" aria-live="polite"></section>
+</main>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" aria-label="History" hidden>
+  <div class="drawer-head">
+    <button class="icon-btn" id="drawer-back" hidden aria-label="Back">←</button>
+    <h2 id="drawer-title">History</h2>
+    <button class="icon-btn" id="drawer-close" aria-label="Close">×</button>
+  </div>
+  <div class="drawer-tools" id="drawer-tools">
+    <input class="input" id="hist-search" type="search" placeholder="Filter" spellcheck="false" aria-label="Filter domains">
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</aside>
+
+<div id="lightbox" hidden><img id="lightbox-img" alt=""></div>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+
+// Build DOM from data with textContent only: page text comes from websites and from the AI.
+function el(tag, props = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === 'class') n.className = v;
+    else if (k === 'text') n.textContent = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat(Infinity)) if (kid !== null && kid !== undefined && kid !== false) n.append(kid);
+  return n;
+}
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+function ago(iso) {
+  const t = Date.parse(iso);
+  if (!t) return '';
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 60) return 'just now';
+  for (const [secs, u] of [[86400 * 365, 'y'], [86400 * 30, 'mo'], [86400, 'd'], [3600, 'h'], [60, 'min']])
+    if (s >= secs) return `${Math.floor(s / secs)} ${u} ago`;
+}
+const when = (iso) => { const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}); };
+
+// ---- pieces ----
+function thumb(src, alt) {
+  if (!src) return el('div', {class: 'thumb none', text: 'no screenshot'});
+  return el('img', {class: 'thumb', src, alt, loading: 'lazy',
+                    onclick: () => { $('#lightbox-img').src = src; $('#lightbox').hidden = false; }});
+}
+
+function parseSummary(text) {
+  const out = {facts: [], content: null, pageType: null, comparison: null, owner: null, signals: [], reused: false};
+  for (const line of (text || '').split('\n')) {
+    const i = line.indexOf(': ');
+    if (i < 0) { if (/^Reused from/.test(line)) out.reused = true; continue; }
+    const k = line.slice(0, i), v = line.slice(i + 2);
+    if (k === 'Content') out.content = v;
+    else if (k === 'Page type') out.pageType = v;
+    else if (k.startsWith('Comparison with ')) out.comparison = v;
+    else if (k.startsWith('Same owner as ')) out.owner = v;
+    else if (k === 'Notable signals') out.signals = v.split('; ').filter(Boolean);
+    else out.facts.push([k, v]);
+  }
+  return out;
+}
+
+function summaryBody(s) {
+  const nodes = [];
+  if (s.facts.length) {
+    nodes.push(el('dl', {class: 'facts'}, s.facts.map(([k, v]) => [
+      el('dt', {text: k}), el('dd', {class: /^not available/.test(v) ? 'na' : null, text: v})])));
+  }
+  if (s.content) {
+    const described = !/^(none -|the site answered|the page is blank|the page loaded, but)/.test(s.content);
+    nodes.push(el('div', {class: 'block' + (described ? '' : ' quiet')},
+      el('h4', {text: 'Content'}), el('p', {text: s.content}),
+      s.pageType ? el('div', {class: 'sub', text: s.pageType}) : null));
+  }
+  if (s.comparison || s.owner) {
+    nodes.push(el('div', {class: 'block'},
+      s.comparison ? el('div', {class: 'row'}, el('b', {text: 'Comparison'}), el('span', {text: s.comparison})) : null,
+      s.owner ? el('div', {class: 'row'}, el('b', {text: 'Same owner'}), el('span', {text: s.owner})) : null));
+  }
+  if (s.signals.length) nodes.push(el('ul', {class: 'signals'}, s.signals.map((x) => el('li', {text: x}))));
+  return nodes;
+}
+
+function tags(sameOwner, reused) {
+  return el('div', {class: 'chips'},
+    sameOwner ? el('span', {class: 'tag owner'}, `same owner: ${sameOwner}`) : null,
+    reused ? el('span', {class: 'tag accent'}, 'from history') : null);
+}
+
+// ---- email text: one language for every text on the page ----
+let lang = store.get('lang') === 'es' ? 'es' : 'en';
+const emailViews = new Set();   // [text node, {en, es}] pairs on the page
+const langSwitches = new Set();
+
+function setLang(next) {
+  lang = next; store.set('lang', lang);
+  for (const view of [...emailViews]) {
+    if (!view[0].isConnected) { emailViews.delete(view); continue; }
+    view[0].textContent = view[1][lang] || '';
+  }
+  for (const seg of langSwitches)
+    for (const b of seg.children) b.setAttribute('aria-pressed', String(b.dataset.lang === lang));
+}
+function langSwitch() {
+  const seg = el('div', {class: 'seg', role: 'group', 'aria-label': 'Language'},
+    ['en', 'es'].map((l) => el('button', {type: 'button', 'data-lang': l, 'aria-pressed': String(l === lang),
+                                          onclick: () => setLang(l)}, l.toUpperCase())));
+  langSwitches.add(seg);
+  return seg;
+}
+async function copyText(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {  // older browsers, or a page not served from localhost
+    const t = el('textarea', {style: 'position:fixed;left:-9999px'});
+    t.value = text; document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
+  }
+  const label = btn.textContent;
+  btn.textContent = 'Copied';
+  setTimeout(() => { btn.textContent = label; }, 1500);
+}
+function emailBlock(email) {
+  const text = el('p', {class: 'email-text', text: email[lang] || ''});
+  emailViews.add([text, email]);
+  return el('div', {class: 'email'},
+    el('div', {class: 'email-bar'}, el('span', {class: 'label', text: 'Email'}),
+       el('button', {class: 'btn', type: 'button', onclick: (e) => copyText(email[lang] || '', e.currentTarget)}, 'Copy')),
+    text);
+}
+
+// ---- takedown: evidence and draft reports, nothing is sent ----
+const KIND = {registrar: 'Registrar', hosting: 'Hosting', cdn: 'CDN', blocklist: 'Blocklist'};
+const CASE = {phishing: 'Phishing', malware: 'Malware', brand_impersonation: 'Brand impersonation'};
+
+function langText(tag, cls, texts) {
+  const node = el(tag, {class: cls, text: texts[lang] || ''});
+  emailViews.add([node, texts]);
+  return node;
+}
+
+function draftBlock(d) {
+  const actions = el('div', {class: 'draft-actions'},
+    el('button', {class: 'btn', type: 'button', onclick: (e) => copyText(d.body[lang] || '', e.currentTarget)}, 'Copy'),
+    d.channel === 'email' ? el('button', {class: 'btn', type: 'button', onclick: () => { location.href = d.eml_url[lang]; }}, '.eml') : null,
+    d.channel === 'form' ? el('button', {class: 'btn', type: 'button', onclick: () => window.open(d.address, '_blank', 'noopener')}, 'Open form') : null);
+  return el('details', {class: 'draft'},
+    el('summary', {}, el('span', {class: 'draft-kind', text: KIND[d.kind] || d.kind}), el('span', {class: 'draft-name', text: d.name}),
+       el('span', {class: 'draft-address', text: d.address || 'no contact published'})),
+    langText('div', 'draft-subject', d.subject), langText('p', 'email-text', d.body), actions);
+}
+
+function takedownBlock(item, run) {
+  const t = item.takedown;
+  const label = t.proposed ? 'Prepare takedown' : 'Prepare anyway';
+  const body = el('div', {class: 'takedown-body'});
+  const btn = el('button', {class: 'btn' + (t.proposed ? ' strong' : ''), type: 'button'}, label);
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Preparing…';
+    try {
+      const resp = await fetch('/api/takedown', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                                 body: JSON.stringify({run, domain: item.domain, force: !t.proposed})});
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      body.replaceChildren(
+        data.case.forced ? el('p', {class: 'takedown-note', text: `Prepared anyway. Not proposed: ${t.reason}`}) : null,
+        el('div', {class: 'evidence-row'},
+          el('button', {class: 'btn', type: 'button', onclick: () => openCase(run, item.domain)}, 'Open case'),
+          el('button', {class: 'btn', type: 'button', onclick: () => { location.href = data.evidence_url; }}, 'Evidence .zip'),
+          el('span', {text: `SHA-256 ${data.case.evidence.sha256.slice(0, 16)}…`})),
+        ...data.drafts.map(draftBlock));
+      loadCasesCount();
+    } catch (e) {
+      body.replaceChildren(el('p', {class: 'takedown-note', text: String(e.message || e)}));
+    } finally {
+      btn.disabled = false; btn.textContent = label;
+    }
+  });
+  return el('div', {class: 'takedown' + (t.proposed ? ' proposed' : '')},
+    el('div', {class: 'takedown-bar'}, el('span', {class: 'label', text: 'Takedown'}),
+       el('span', {class: 'takedown-status', text: t.proposed ? `${CASE[t.case_type] || t.case_type} · ${t.priority} priority`
+                                                              : `Not proposed: ${t.reason}`}), btn),
+    body);
+}
+
+function resultCard(item, run) {
+  const s = parseSummary(item.text);
+  return el('article', {class: 'result'},
+    el('div', {class: 'result-head'},
+      el('div', {}, el('h3', {text: item.domain}), tags(item.same_owner, s.reused)),
+      thumb(item.screenshot, item.domain)),
+    el('div', {class: 'result-body'}, emailBlock(item.email), item.takedown ? takedownBlock(item, run) : null, summaryBody(s)));
+}
+
+// ---- composer ----
+const compare = $('#compare'), monitored = $('#monitored'), status = $('#status'), go = $('#go'), feed = $('#feed');
+function setCompare(on) {
+  compare.setAttribute('aria-checked', String(on));
+  $('#compare-opts').hidden = !on;
+  store.set('compare', on ? '1' : '0');
+}
+setCompare(store.get('compare') === '1');
+monitored.value = store.get('monitored') || '';
+$('#toggle').addEventListener('click', () => {
+  setCompare(compare.getAttribute('aria-checked') !== 'true');
+  if (compare.getAttribute('aria-checked') === 'true') monitored.focus();
+});
+monitored.addEventListener('input', () => store.set('monitored', monitored.value.trim()));
+const say = (text, isError) => { status.textContent = text; status.className = 'status' + (isError ? ' error' : ''); };
+
+let timer;
+go.addEventListener('click', async () => {
+  const domains = $('#domains').value;
+  const count = domains.split('\n').filter((d) => d.trim()).length;
+  if (!count) { say('Enter at least one domain.', true); $('#domains').focus(); return; }
+  const comparing = compare.getAttribute('aria-checked') === 'true';
+  const target = comparing ? monitored.value.trim() : '';
+  if (comparing && !target) { say('Enter the monitored domain.', true); monitored.focus(); return; }
+  go.disabled = true; go.textContent = 'Checking…';
+  const started = Date.now();
+  const tick = () => { const s = Math.floor((Date.now() - started) / 1000); say(`${count} domain${count === 1 ? '' : 's'} · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`); };
+  tick(); timer = setInterval(tick, 1000);
+  try {
+    const resp = await fetch('/api/analyze', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                              body: JSON.stringify({domains, monitored: target})});
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    clearInterval(timer); say('');
+    const results = data.results || [];
+    const copyAll = el('button', {class: 'btn', type: 'button',
+      onclick: (e) => copyText(results.map((r) => r.email[lang] || '').join('\n\n\n'), e.currentTarget)}, 'Copy all');
+    feed.replaceChildren(el('div', {class: 'feed-head'}, el('h2', {text: 'Results'}), el('p', {text: data.header || ''}),
+                            el('div', {class: 'feed-tools'}, langSwitch(), copyAll)),
+                         ...results.map((r) => resultCard(r, data.run)));
+    loadHistoryTile();
+  } catch (e) {
+    clearInterval(timer); say(String(e.message || e), true);
+  } finally {
+    go.disabled = false; go.textContent = 'Run check';
+  }
+});
+
+// ---- history ----
+async function fetchHistory() {
+  return await (await fetch('/api/history')).json();
+}
+async function loadHistoryTile() {
+  try {
+    const h = await fetchHistory();
+    $('#hist-count').textContent = String(h.domains.length);
+    $('#hist-recent').replaceChildren(...h.domains.slice(0, 6).map((d) =>
+      el('li', {onclick: (e) => { e.stopPropagation(); openDrawer(d.domain); }},
+         el('span', {text: d.domain}), el('span', {text: ago(d.last_check)}))));
+  } catch (e) {
+    $('#hist-count').textContent = '!';
+  }
+}
+
+// The side panel shows either the history or the takedown cases; Back returns to that list.
+let drawerHome = showDomainList;
+function showDrawer(home) {
+  drawerHome = home;
+  $('#hist-search').value = '';
+  $('#drawer').hidden = false; $('#scrim').hidden = false;
+}
+function openDrawer(domain) {
+  showDrawer(showDomainList);
+  domain ? showDomain(domain) : showDomainList();
+}
+function closeDrawer() { $('#drawer').hidden = true; $('#scrim').hidden = true; }
+
+async function showDomainList() {
+  $('#drawer-title').textContent = 'History';
+  $('#drawer-back').hidden = true; $('#drawer-tools').hidden = false;
+  const body = $('#drawer-body');
+  const h = await fetchHistory();
+  const render = () => {
+    const q = $('#hist-search').value.trim().toLowerCase();
+    const rows = h.domains.filter((d) => d.domain.includes(q));
+    body.replaceChildren(...(rows.length ? rows.map((d) => el('button', {class: 'dom-row', onclick: () => showDomain(d.domain)},
+        el('span', {class: 'name', text: d.domain}),
+        el('span', {class: 'meta', text: `${d.checks} × · ${ago(d.last_check)}`}))) : [el('div', {class: 'empty', text: 'Nothing found.'})]));
+  };
+  $('#hist-search').oninput = render;
+  render();
+}
+
+async function showDomain(domain) {
+  $('#drawer-title').textContent = domain;
+  $('#drawer-back').hidden = false; $('#drawer-tools').hidden = true;
+  const data = await (await fetch('/api/history/' + encodeURIComponent(domain))).json();
+  const checks = data.checks || [];
+  const again = el('button', {class: 'ghost', onclick: () => {
+    $('#domains').value = domain;
+    if (checks[0] && checks[0].monitored) { setCompare(true); monitored.value = checks[0].monitored; store.set('monitored', checks[0].monitored); }
+    closeDrawer(); go.focus();
+  }}, 'Check again');
+  $('#drawer-body').replaceChildren(
+    el('div', {class: 'detail-bar'}, el('span', {class: 'tag', text: `${checks.length} check${checks.length === 1 ? '' : 's'}`}),
+       el('div', {class: 'feed-tools'}, langSwitch(), again)),
+    ...checks.map((c) => el('div', {class: 'check'},
+      el('div', {class: 'check-when', text: `${when(c.checked_at)} · ${ago(c.checked_at)}`}),
+      el('div', {class: 'check-run', text: c.run + (c.monitored ? ` · vs ${c.monitored}` : '')}),
+      c.same_owner ? tags(c.same_owner) : null,
+      emailBlock(c.email),
+      summaryBody(parseSummary(c.summary)),
+      c.screenshot_url ? thumb(c.screenshot_url, domain) : null)));
+}
+
+// ---- takedown cases: everything prepared, from the page or with `recon takedown` ----
+const fetchCases = async () => (await (await fetch('/api/takedowns')).json()).cases || [];
+const caseLabel = (c, priority) => `${CASE[c.case_type] || c.case_type || 'Case'} · ${c.forced ? 'not proposed' : `${priority} priority`}`;
+
+async function loadCasesCount() {
+  try {
+    const n = (await fetchCases()).length;
+    $('#cases-count').textContent = String(n);
+    $('#cases-count').classList.toggle('active', n > 0);
+  } catch (e) {
+    $('#cases-count').textContent = '!';
+  }
+}
+function openCases() { showDrawer(showCaseList); showCaseList(); }
+function openCase(run, domain) { showDrawer(showCaseList); showCase(run, domain); }
+
+async function showCaseList() {
+  $('#drawer-title').textContent = 'Takedowns';
+  $('#drawer-back').hidden = true; $('#drawer-tools').hidden = false;
+  const body = $('#drawer-body');
+  const cases = await fetchCases();
+  const render = () => {
+    const q = $('#hist-search').value.trim().toLowerCase();
+    const rows = cases.filter((c) => c.domain.includes(q));
+    body.replaceChildren(...(rows.length ? rows.map((c) => el('button', {class: 'dom-row', onclick: () => showCase(c.run, c.domain)},
+        el('span', {}, el('span', {class: 'name', text: c.domain}),
+           el('span', {class: 'case-line' + (c.forced ? '' : ` ${c.priority}`), text: caseLabel(c, c.priority)})),
+        el('span', {class: 'meta', text: `${c.recipients} recipients · ${ago(c.prepared_at)}`})))
+      : [el('div', {class: 'empty', text: cases.length ? 'Nothing found.' : 'No takedown prepared yet.'})]));
+  };
+  $('#hist-search').oninput = render;
+  render();
+}
+
+async function showCase(run, domain) {
+  $('#drawer-title').textContent = domain;
+  $('#drawer-back').hidden = false; $('#drawer-tools').hidden = true;
+  const data = await (await fetch(`/api/takedowns/${encodeURIComponent(run)}/${encodeURIComponent(domain)}`)).json();
+  if (data.error) { $('#drawer-body').replaceChildren(el('div', {class: 'empty', text: data.error})); return; }
+  const c = data.case, q = c.qualification || {}, ind = c.indicators || {}, files = Object.entries(c.evidence.files || {});
+  const indicators = [['Password fields', ind.password_fields], ['Card fields', ind.card_fields], ['Forms', ind.forms],
+                      ['Forms submit to', (ind.form_targets || []).join(', ') || '-']];
+  $('#drawer-body').replaceChildren(
+    el('div', {class: 'detail-bar'}, el('span', {class: 'tag' + (c.forced ? '' : ' danger'), text: caseLabel(c, q.priority)}),
+       el('div', {class: 'feed-tools'}, langSwitch())),
+    el('div', {class: 'check'},
+      el('div', {class: 'check-when', text: `${when(c.prepared_at)} · ${ago(c.prepared_at)}`}),
+      el('div', {class: 'check-run', text: run + (c.monitored ? ` · vs ${c.monitored}` : '')}),
+      c.forced ? el('p', {class: 'takedown-note', text: `Not proposed: ${q.reason}`}) : null,
+      data.screenshot_url ? thumb(data.screenshot_url, domain) : null,
+      el('dl', {class: 'facts'}, indicators.map(([k, v]) => [el('dt', {text: k}), el('dd', {text: String(v ?? 0)})])),
+      el('div', {class: 'evidence-row'},
+        el('button', {class: 'btn', type: 'button', onclick: () => { location.href = data.evidence_url; }}, 'Evidence .zip'),
+        el('span', {text: `SHA-256 ${c.evidence.sha256.slice(0, 16)}…`})),
+      el('details', {class: 'draft'},
+        el('summary', {}, el('span', {class: 'draft-kind', text: 'Checksums'}), el('span', {class: 'draft-name', text: `${files.length} files`})),
+        el('dl', {class: 'facts checksums'}, files.map(([name, sha]) => [el('dt', {text: name}), el('dd', {class: 'mono', text: sha})]))),
+      ...data.drafts.map(draftBlock)));
+}
+
+$('#cases-btn').addEventListener('click', openCases);
+$('#history-tile').addEventListener('click', () => openDrawer());
+$('#history-tile').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDrawer(); } });
+$('#drawer-close').addEventListener('click', closeDrawer);
+$('#drawer-back').addEventListener('click', () => drawerHome());
+$('#scrim').addEventListener('click', closeDrawer);
+$('#lightbox').addEventListener('click', () => { $('#lightbox').hidden = true; $('#lightbox-img').src = ''; });
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!$('#lightbox').hidden) { $('#lightbox').hidden = true; return; }
+  closeDrawer();
+});
+loadHistoryTile();
+loadCasesCount();
+</script>
+</body>
+</html>
