@@ -3,6 +3,11 @@
 Investigates suspicious domains (lookalikes, typosquats, phishing candidates) and compares each one
 with the domain you protect.
 
+![The domain-recon web app checking paypa1.com against paypal.com](docs/web-app.png)
+
+*`paypa1.com` checked against `paypal.com`: the lookalike redirects to PayPal's real site, so the tool
+judges that both likely have the same owner and proposes no takedown.*
+
 For every domain it collects:
 
 - **Registration**: creation date, registrar and statuses (RDAP, with whois as the fallback)
